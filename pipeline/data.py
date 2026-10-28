@@ -20,7 +20,7 @@ def load_data(path: str = "data/train_data.csv") -> pd.DataFrame:
 
     # Normalize target → binary 0/1
     mapping = {"anomaly": 1, "normal": 0}
-    if df[TARGET_COL].dtype == object:
+    if pd.api.types.is_string_dtype(df[TARGET_COL]):
         df[TARGET_COL] = df[TARGET_COL].map(mapping)
     # If already numeric, assume 0/1
     if not set(df[TARGET_COL].unique()).issubset({0, 1}):
