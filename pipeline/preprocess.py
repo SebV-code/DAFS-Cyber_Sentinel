@@ -1,8 +1,13 @@
 import pandas as pd
+
 from typing import Tuple
-from sklearn.model_selection import train_test_split
+
 from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
 
 CATEGORICAL = ["protocol_type", "service", "flag"]
 TARGET = "class"
@@ -23,11 +28,33 @@ def preprocess(df: pd.DataFrame) -> Tuple:
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.25, random_state=42, stratify=y
     )
+##### AJOUT D'UN PIPELINE POUR LES DONNEES NUMERIQUES AVEC UN SIMPLEIMPUTER
+    numeric_transformer = Pipeline(
+                                    steps=[
+                                            (
+                                                "imputer",
+                                                SimpleImputer(strategy="mean"),
+                                            ),  # missing values will be replaced by columns' mean
+                                            ("scaler", StandardScaler()),
+                                        ]
+                                    )
+##### AJOUT D'UN PIPELINE POUR LES DONNEES CATEGORIELLES AVEC UN SIMPLEIMPUTER
+
+    categorical_transformer = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        (
+            "encoder",
+            OneHotEncoder(
+                handle_unknown="ignore",
+                min_frequency=10,
+            ),
+        ),
+    ])
 
     preproc = ColumnTransformer(
         transformers=[
-            ("num", StandardScaler(with_mean=False), num_cols),       # sparse-friendly
-            ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
+            ("num", numeric_transformer, num_cols),       # sparse-friendly
+            ("cat", categorical_transformer, cat_cols),
         ],
         remainder="drop",
         sparse_threshold=0.3,   # keep it sparse if many OHE cols

@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -52,7 +53,7 @@ def make_plots(model, X_test, y_test, df_full, outdir: str):
     # Precision–Recall curve
     try:
         prec, rec, _ = precision_recall_curve(y_test, y_proba)
-        ap = np.trapz(prec[::-1], rec[::-1])  # rough area; AP is in metrics.json
+        ap = auc(rec, prec)  # rough area; AP is in metrics.json => correction
         plt.figure()
         plt.plot(rec, prec, label=f"Area ≈ {ap:.3f}")
         plt.xlabel("Recall")
@@ -88,3 +89,80 @@ def make_plots(model, X_test, y_test, df_full, outdir: str):
             plt.close()
     except Exception:
         pass
+
+     # add per-flag/per-service breakdowns
+    for col in ["flag", "service"]: # on crée 2 images, une sur flag et l'autre sur service
+        try:
+            df_err = pd.DataFrame({ # création d'un df 3 col : service, vrai réponse, réponse du modèle
+                col: X_test[col].values,
+                "y_true": y_test.values,
+                "y_pred": y_pred,
+            })
+            df_err["erreur"] = (df_err["y_true"] != df_err["y_pred"]).astype(int) # 4ème col : 1 si le modèle se trompe, 0 sinon
+
+            stats = (df_err.groupby(col)["erreur"] # rangement des lignes par service
+                           .agg(["mean", "count"]) # pourcentage d'erreur et nb de connexion pour chaque service
+                           .sort_values("count", ascending=False)
+                           .head(15)               # garde les 15 services les plus fréquents
+                           .reset_index())         # remet le nom du service dans une vrai colonne
+
+            plt.figure(figsize=(7, max(3, len(stats) * 0.35))) # préparatio de l'image vide et haute s'il y a beaucoup de barres
+            sns.barplot(data=stats, x="mean", y=col, orient="h") # barre horizontale par service, longueur = % d'erreur
+            plt.title(f"Taux d'erreur par {col} (top {len(stats)} par volume)")
+            plt.xlabel("Taux d'erreur")
+            plt.tight_layout()          # évite que le texte soit coupé
+            plt.savefig(os.path.join(outdir, f"errors_by_{col}.png"), dpi=150) # sauvegarde de l'image dans outputs
+            plt.close()
+        except Exception as e:
+            print(f"Erreur graphique {col} :", e)
+
+    # Error analysis
+    try:
+        df_res = X_test.copy()              # copie pour pas abier l'original
+        df_res["y_true"] = y_test.values    # ajout d'une colonne avec la vrai réponse (0=normal, 1=attaque)
+        df_res["y_pred"] = y_pred           # ajout d'une colonne avec la réponse du modèle
+        df_res["proba_anomalie"] = y_proba  # ajout d'une colonne avec la certitude du modèle
+
+        df_res["resultat"] = "correct"      # création d'une colonne résultat avec la valeur correct
+        # écrire fausse alerte ou attaque ratee uniquement sur les lignes respectant la condition
+        df_res.loc[(df_res["y_true"] == 0) & (df_res["y_pred"] == 1), "resultat"] = "fausse alerte (FP)"
+        df_res.loc[(df_res["y_true"] == 1) & (df_res["y_pred"] == 0), "resultat"] = "attaque ratee (FN)"
+
+        erreurs = df_res[df_res["resultat"] != "correct"] # garder uniquement les lignes pas correctes
+        erreurs.to_csv(os.path.join(outdir, "erreurs.csv"), index=False) # enregistre ces lignes dans le csv
+
+        comptes = erreurs["resultat"].value_counts() # nb de FP et FN
+        plt.figure(figsize=(6, 4)) # préparation image vide 6 x 4
+        sns.barplot(x=comptes.index, y=comptes.values) # bar par type d'erreur
+        plt.title(f"Types d'erreurs ({len(erreurs)} au total)")
+        plt.ylabel("Nombre")
+        plt.tight_layout()
+        plt.savefig(os.path.join(outdir, "types_erreurs.png"), dpi=150)
+        plt.close()
+    except Exception as e:
+        print("Erreur analyse des erreurs :", e)
+
+    # threshold-sweep plots
+    # résultat du visu : 0.5 de seuil semble être le plus adapté car il vaut mieux rater peu de vrai attaques avec plus de fausses alertes
+    try:
+        seuils = np.linspace(0.05, 0.95, 19) # liste des seuils à tester
+        nb_fp = []
+        nb_fn = []
+        for s in seuils:
+            pred_s = (y_proba >= s).astype(int) # refais les prédictions avec le seuil
+            nb_fp.append(int(((y_test.values == 0) & (pred_s == 1)).sum())) # compte les fausses alertes FP pour le seuil
+            nb_fn.append(int(((y_test.values == 1) & (pred_s == 0)).sum())) # compte les alertes ratés FN pour le seuil
+
+        plt.figure(figsize=(7, 4))
+        plt.plot(seuils, nb_fp, marker="o", label="Fausses alertes (FP)") # courbe des FP
+        plt.plot(seuils, nb_fn, marker="o", label="Attaques ratees (FN)") # courbe des FN
+        plt.axvline(0.5, linestyle="--", color="grey", label="Seuil actuel (0.5)")
+        plt.xlabel("Seuil de decision")
+        plt.ylabel("Nombre d'erreurs")
+        plt.title("Erreurs selon le seuil de decision")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(outdir, "threshold_sweep.png"), dpi=150)
+        plt.close()
+    except Exception as e:
+        print("Erreur threshold sweep :", e)
