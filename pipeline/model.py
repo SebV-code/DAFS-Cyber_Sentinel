@@ -28,7 +28,7 @@ def train_model(X_train, y_train, preproc, seed: int = 42):
 
     spw = _scale_pos_weight(y_tr)
     clf = XGBClassifier(
-        n_estimators=300,
+        n_estimators=1000,
         max_depth=4,
         learning_rate=0.08,
         subsample=0.9,
