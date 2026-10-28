@@ -1,8 +1,13 @@
 import pandas as pd
+
 from typing import Tuple
-from sklearn.model_selection import train_test_split
+
 from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
 
 CATEGORICAL = ["protocol_type", "service", "flag"]
 TARGET = "class"
@@ -23,10 +28,20 @@ def preprocess(df: pd.DataFrame) -> Tuple:
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.25, random_state=42, stratify=y
     )
+##### AJOUT D'UN PIPELINE POUR LES DONNEES NUMERIQUES AVEC UN SIMPLEIMPUTER
+    numeric_transformer = Pipeline(
+                                    steps=[
+                                            (
+                                                "imputer",
+                                                SimpleImputer(strategy="mean"),
+                                            ),  # missing values will be replaced by columns' mean
+                                            ("scaler", StandardScaler()),
+                                        ]
+                                    )
 
     preproc = ColumnTransformer(
         transformers=[
-            ("num", StandardScaler(with_mean=False), num_cols),       # sparse-friendly
+            ("num", numeric_transformer, num_cols),       # sparse-friendly
             ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
         ],
         remainder="drop",
