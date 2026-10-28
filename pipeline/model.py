@@ -23,6 +23,9 @@ def train_model(X_train, y_train, preproc, seed: int = 42):
     stratify=y_train,       # sur quelle variable garder les proportions de classes
     random_state=seed,   # pour la reproductibilité
     )
+    X_tr_processed=preproc.fit_transform(X_tr)
+    X_valid_processed=preproc.transform(X_valid)
+
     spw = _scale_pos_weight(y_tr)
     clf = XGBClassifier(
         n_estimators=300,
@@ -38,8 +41,11 @@ def train_model(X_train, y_train, preproc, seed: int = 42):
         tree_method="hist",
         scale_pos_weight=spw,  # key for imbalance
         verbosity=0,
-        use_label_encoder=False
+        use_label_encoder=False,
+        early_stopping_rounds=30
     )
+    clf.fit(X_tr_processed,y_tr,eval_set=[(X_valid_processed,y_valid)])
+    
     pipe = Pipeline([("preproc", preproc), ("model", clf)])
-    pipe.fit(X_tr, y_tr)
+    
     return pipe
