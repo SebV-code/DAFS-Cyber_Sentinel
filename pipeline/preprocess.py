@@ -38,11 +38,23 @@ def preprocess(df: pd.DataFrame) -> Tuple:
                                             ("scaler", StandardScaler()),
                                         ]
                                     )
+##### AJOUT D'UN PIPELINE POUR LES DONNEES CATEGORIELLES AVEC UN SIMPLEIMPUTER
+
+    categorical_transformer = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        (
+            "encoder",
+            OneHotEncoder(
+                handle_unknown="ignore",
+                min_frequency=10,
+            ),
+        ),
+    ])
 
     preproc = ColumnTransformer(
         transformers=[
             ("num", numeric_transformer, num_cols),       # sparse-friendly
-            ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
+            ("cat", categorical_transformer, cat_cols),
         ],
         remainder="drop",
         sparse_threshold=0.3,   # keep it sparse if many OHE cols
