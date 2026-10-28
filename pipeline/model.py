@@ -1,6 +1,7 @@
 from typing import Optional
 from xgboost import XGBClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 import numpy as np
 
 def _scale_pos_weight(y):
@@ -14,8 +15,15 @@ def train_model(X_train, y_train, preproc, seed: int = 42):
     Build a Pipeline(preproc → XGBClassifier) and fit.
     Uses scale_pos_weight to handle class imbalance (anomaly = positive).
     TODO (Student C): tune hyperparams, early_stopping_rounds with a valid set, CV grid, threshold tuning.
+     
     """
-    spw = _scale_pos_weight(y_train)
+    X_tr, X_valid, y_tr, y_valid = train_test_split(
+    X_train, y_train,
+    test_size=0.2,      # la proportion qui part dans le 2e morceau
+    stratify=y_train,       # sur quelle variable garder les proportions de classes
+    random_state=seed,   # pour la reproductibilité
+    )
+    spw = _scale_pos_weight(y_tr)
     clf = XGBClassifier(
         n_estimators=300,
         max_depth=4,
@@ -33,5 +41,5 @@ def train_model(X_train, y_train, preproc, seed: int = 42):
         use_label_encoder=False
     )
     pipe = Pipeline([("preproc", preproc), ("model", clf)])
-    pipe.fit(X_train, y_train)
+    pipe.fit(X_tr, y_tr)
     return pipe
