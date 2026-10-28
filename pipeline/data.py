@@ -14,7 +14,7 @@ def load_data(path: str = "data/train_data.csv") -> pd.DataFrame:
     1 = anomaly (positive class), 0 = normal.
     TODO (Student A): add dtype hints, NA handling policy, schema validation, and logging.
     """
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype={c: str for c in EXPECTED_CATEGORICAL})
     logger.info(f"Données chargées: {df.shape[0]} lignes, {df.shape[1]} colonnes")
 
     # basic sanity checks
@@ -52,6 +52,7 @@ def load_data(path: str = "data/train_data.csv") -> pd.DataFrame:
 
     df[EXPECTED_CATEGORICAL] = df[EXPECTED_CATEGORICAL].fillna("unknown")
 
+    
     # Normalize target → binary 0/1
     mapping = {"anomaly": 1, "normal": 0}
     if pd.api.types.is_string_dtype(df[TARGET_COL]):
