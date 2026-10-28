@@ -31,7 +31,15 @@ def load_data(path: str = "data/train_data.csv") -> pd.DataFrame:
     not_numeric = [c for c in num_cols if not pd.api.types.is_numeric_dtype(df[c])]
     if not_numeric:
         raise ValueError(f"Non-numeric values in numeric columns: {not_numeric}")
-        
+
+    n_dup= df.duplicated().sum()
+    if n_dup > 0:
+        logger.warning(f"{n_dup} lignes en double reperées")
+    constant_cols= [c for c in df.columns if df[c].nunique() == 1]
+    if constant_cols:
+        logger.warning (f"Colonnes constantes (une seule valeur) : {constant_cols}")
+
+
 
     # Normalize target → binary 0/1
     mapping = {"anomaly": 1, "normal": 0}
