@@ -39,7 +39,18 @@ def load_data(path: str = "data/train_data.csv") -> pd.DataFrame:
     if constant_cols:
         logger.warning (f"Colonnes constantes (une seule valeur) : {constant_cols}")
 
+    na_counts = df.isna().sum()           # nombre de NA par colonne
+    na_cols = na_counts[na_counts > 0]    # seulement les colonnes qui en ont
+    if not na_cols.empty:
+        logger.warning(f"Valeurs manquantes : {na_cols.to_dict()}")
 
+    n_before = len(df)
+    df = df.dropna(subset=[TARGET_COL])
+    n_dropped = n_before - len(df)
+    if n_dropped > 0:
+        logger.warning(f"{n_dropped} lignes supprimées : cible '{TARGET_COL}' manquante")
+
+    df[EXPECTED_CATEGORICAL] = df[EXPECTED_CATEGORICAL].fillna("unknown")
 
     # Normalize target → binary 0/1
     mapping = {"anomaly": 1, "normal": 0}
